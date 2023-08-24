@@ -361,7 +361,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--scale", help="raster scale", type=float, default=1.0)
     parser.add_argument("--buffer", help="line buffer [m]", type=float, default=8.0)
-    parser.add_argument("--keep-knot", help="keep image knots", action="store_false")
+    parser.add_argument("--knot", help="keep image knots", action="store_false")
     args = parser.parse_args()
     FILEPATH = args.inpath
     OUTPATH = args.outpath
