@@ -114,9 +114,9 @@ def get_geometry_buffer(this_gf, segment=5.0, radius=BUFFER):
     """get_geometry_buffer: return radius buffered geometry using segmented GeoDataFrame
 
     args:
-      this_gf:
-      segment:  (Default value = 5.0)
-      radius:  (Default value = BUFFER)
+      this_gf: GeoDataFrame to
+      segment:  (default value = 5.0)
+      radius:  (default value = BUFFER)
 
     returns:
       buffered GeoSeries geometry
@@ -151,9 +151,10 @@ def nx_out(this_gf, transform, filepath, layer):
     """nx_out: write transform GeoPandas data to GeoPKG layer
 
     args:
-      this_gf:
-      transform:
-      layer:
+      this_gf: GeoDataFrame to output
+      transform: affine transform
+      filepath: GeoPKG filepath
+      layer: layer name
 
     returns:
       None
@@ -164,7 +165,7 @@ def nx_out(this_gf, transform, filepath, layer):
         r = r.to_frame("geometry")
     except AttributeError:
         pass
-    geometry = r["geometry"].map(transform)
+    geometry = r["geometry"].map(transform).map(set_precision_pointone)
     r["geometry"] = geometry
     write_dataframe(r, filepath, layer=layer)
 
