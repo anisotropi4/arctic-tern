@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-"""simplify.py: simplify a GeoJSON network and output as GeoPKG layers"""
+"""simplify.py: simplify GeoJSON network toGeoPKG layers using image skeletonization"""
 
+import argparse
 import datetime as dt
 import warnings
 from functools import partial
@@ -22,10 +23,9 @@ TRANSFORM_ONE = np.asarray([0.0, 1.0, -1.0, 0.0, 1.0, 1.0])
 
 START = dt.datetime.now()
 
-OUTPATH = "dx3.gpkg"
+OUTPATH = "output.gpkg"
 CRS = "EPSG:27700"
 
-SCALE = 1.0
 BUFFER = 8.0
 
 
@@ -147,7 +147,7 @@ def get_raster_point(raster, value=1):
     return gp.GeoSeries(map(Point, r.T), crs=CRS)
 
 
-def nx_out(this_gf, transform, layer):
+def nx_out(this_gf, transform, filepath, layer):
     """nx_out: write transform GeoPandas data to GeoPKG layer
 
     args:
@@ -166,7 +166,7 @@ def nx_out(this_gf, transform, layer):
         pass
     geometry = r["geometry"].map(transform)
     r["geometry"] = geometry
-    write_dataframe(r, OUTPATH, layer=layer)
+    write_dataframe(r, filepath, layer=layer)
 
 
 def combine_line(line):
@@ -198,7 +198,7 @@ def get_end(geometry):
 
 
 def get_source_target(line):
-    """get_source_target: return edge and node GeoDataFrames from LineString with unique 
+    """get_source_target: return edge and node GeoDataFrames from LineString with unique
     node Point and edge source and target
 
     args:
@@ -323,8 +323,8 @@ def get_raster_line(point, knot=False):
     return r[r.length > 2.0]
 
 
-def main(path, knot=False):
-    """main: load GeoJSON file, use skeletonize buffer to simplify network, and output 
+def main(path, outpath, buffer_size, scale, knot=False):
+    """main: load GeoJSON file, use skeletonize buffer to simplify network, and output
     input, simplified and primal network as GeoPKG layers
 
     args:
@@ -336,20 +336,36 @@ def main(path, knot=False):
     """
     log("start")
     base_nx = get_base_geojson(path)
-    base_nx.to_file(OUTPATH, layer="input")
-    nx_geometry = get_geometry_buffer(base_nx["geometry"])
-    r_matrix, s_matrix, out_shape = get_affine_transform(nx_geometry, SCALE)
+    write_dataframe(base_nx, outpath, layer="input")
+    nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=buffer_size)
+    r_matrix, s_matrix, out_shape = get_affine_transform(nx_geometry, scale)
     shapely_transform = partial(affine_transform, matrix=s_matrix)
     skeleton_im = get_skeleton(nx_geometry, r_matrix, out_shape)
     nx_point = get_raster_point(skeleton_im)
     nx_line = get_raster_line(nx_point, knot)
-    nx_out(nx_line, shapely_transform, "line")
+    nx_out(nx_line, shapely_transform, outpath, "line")
     nx_edge, _ = get_nx(nx_line)
-    nx_out(nx_edge, shapely_transform, "primal")
+    nx_out(nx_edge, shapely_transform, outpath, "primal")
     log("stop")
 
 
 if __name__ == "__main__":
-    main(
-        "data/rnet_princes_street.geojson",
+    parser = argparse.ArgumentParser(description="simplify GeoJSON network")
+    parser.add_argument("inpath", type=str, help="GeoJSON filepath to simplify")
+    parser.add_argument(
+        "outpath",
+        nargs="?",
+        type=str,
+        help="GeoGPKG output path",
+        default="output.gpkg",
     )
+    parser.add_argument("--scale", help="raster scale", type=float, default=1.0)
+    parser.add_argument("--buffer", help="line buffer [m]", type=float, default=8.0)
+    parser.add_argument("--knot", help="remove image knots", action="store_false")
+    args = parser.parse_args()
+    FILEPATH = args.inpath
+    OUTPATH = args.outpath
+    BUFFER_SIZE = args.buffer
+    KNOT = args.knot
+    SCALE = args.scale
+    main(FILEPATH, outpath=OUTPATH, buffer_size=BUFFER_SIZE, scale=SCALE, knot=KNOT)
