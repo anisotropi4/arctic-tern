@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import rasterio as rio
 import rasterio.features as rif
-from pyogrio import write_dataframe
+from pyogrio import read_dataframe, write_dataframe
 from shapely import get_coordinates, line_merge, set_precision, unary_union
 from shapely.affinity import affine_transform
 from shapely.geometry import LineString, MultiLineString, MultiPoint, Point
@@ -39,7 +39,7 @@ def get_base_geojson(filepath):
       GeoDataFrame at 0.1m precision
 
     """
-    r = gp.read_file(filepath).to_crs(CRS)
+    r = read_dataframe(filepath).to_crs(CRS)
     r["geometry"] = r["geometry"].map(set_precision_pointone)
     return r
 
@@ -335,19 +335,23 @@ def main(path, outpath, buffer_size, scale, knot=False):
        None
 
     """
-    log("start")
+    log("start\t")
     base_nx = get_base_geojson(path)
+    log("read\tgeojson")
     write_dataframe(base_nx, outpath, layer="input")
+    log("process\t")
     nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=buffer_size)
     r_matrix, s_matrix, out_shape = get_affine_transform(nx_geometry, scale)
     shapely_transform = partial(affine_transform, matrix=s_matrix)
     skeleton_im = get_skeleton(nx_geometry, r_matrix, out_shape)
     nx_point = get_raster_point(skeleton_im)
     nx_line = get_raster_line(nx_point, knot)
+    log("write\tsimple")
     nx_out(nx_line, shapely_transform, outpath, "line")
+    log("write\tprimal")
     nx_edge, _ = get_nx(nx_line)
     nx_out(nx_edge, shapely_transform, outpath, "primal")
-    log("stop")
+    log("stop\t")
 
 
 if __name__ == "__main__":
@@ -364,9 +368,10 @@ if __name__ == "__main__":
     parser.add_argument("--buffer", help="line buffer [m]", type=float, default=8.0)
     parser.add_argument("--knot", help="keep image knots", action="store_false")
     args = parser.parse_args()
-    FILEPATH = args.inpath
-    OUTPATH = args.outpath
-    BUFFER_SIZE = args.buffer
-    KNOT = args.knot
-    SCALE = args.scale
-    main(FILEPATH, outpath=OUTPATH, buffer_size=BUFFER_SIZE, scale=SCALE, knot=KNOT)
+    main(
+        args.inpath,
+        outpath=args.outpath,
+        buffer_size=args.buffer,
+        scale=args.scale,
+        knot=args.knot,
+    )
