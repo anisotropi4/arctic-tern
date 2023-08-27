@@ -1,9 +1,19 @@
 # artic-tern
-Network simplification using image skeletonization
+GeoJSON network simplification using raster image skeletonization and Voronoi polygons
 
-# Initial commit
-This is an initial commit of code to simplify a road network where you have parallel edges, braiding and loops into a route based simplified linear network.
+The load GeoJSON file, use Voronoi polygons to simplify network, and output GeoPKG layers corresponding to the input, simplified and primal network
 
-The sample data set is of Queenstreet in Edinburgh. There is a glitch with a four-way node that needs fixing.
+The sample data set is of Queenstreet in Edinburgh kindly shared by Robin Lovelace
 
-Although a generic approach, the lines are a bit wobbly
+## Skeletonization
+This creates a simplified network by applying skeletonization to a buffered raster array
+
+## Voronoi
+This creates a simplified network by creating set of Voronoi polygons from points on the buffer
+
+## Notes
+Both are the skeletonization and Voronoi approach are generic approaches, with the following known issues:
+
+* This does not maintain a link between attributes and the simplified network
+* This does not identify a subset of edges that need simplification
+* The lines are a bit wobbly
