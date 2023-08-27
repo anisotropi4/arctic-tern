@@ -18,13 +18,25 @@ from shapely.affinity import affine_transform
 from shapely.geometry import LineString, MultiLineString, MultiPoint, Point
 from skimage.morphology import remove_small_holes, skeletonize
 
-pd.set_option("display.max_columns", None)
 TRANSFORM_ONE = np.asarray([0.0, 1.0, -1.0, 0.0, 1.0, 1.0])
 
+pd.set_option("display.max_columns", None)
 START = dt.datetime.now()
-
-OUTPATH = "output.gpkg"
 CRS = "EPSG:27700"
+
+
+def combine_line(line):
+    """combine_line: return LineString GeoSeries combining lines with intersecting endpoints
+
+    args:
+      line: mixed LineString GeoSeries
+
+    returns:
+      join LineString GeoSeries
+
+    """
+    r = MultiLineString(line.values)
+    return gp.GeoSeries(line_merge(r).geoms, crs=CRS)
 
 
 def get_base_geojson(filepath):
@@ -40,6 +52,96 @@ def get_base_geojson(filepath):
     r = read_dataframe(filepath).to_crs(CRS)
     r["geometry"] = r["geometry"].map(set_precision_pointone)
     return r
+
+
+def get_end(geometry):
+    """get_end: return numpy array of geometry LineString end-points
+
+    args:
+      geometry: geometry LineString
+
+    returns:
+      end-point numpy arrays
+
+    """
+    r = get_coordinates(geometry)
+    return np.vstack((r[0, :], r[-1, :]))
+
+
+def get_geometry_buffer(this_gf, segment=5.0, radius=8.0):
+    """get_geometry_buffer: return radius buffered geometry using segmented GeoDataFrame
+
+    args:
+      this_gf: GeoDataFrame to
+      segment: (default value = 5.0)
+      radius: (default value = 8.0)
+
+    returns:
+      buffered GeoSeries geometry
+
+    """
+    set_segment = partial(get_segment, distance=segment)
+    r = this_gf.map(set_segment).explode()
+    r = gp.GeoSeries(r, crs=CRS).buffer(radius, join_style="mitre")
+    union = unary_union(r)
+    try:
+        r = gp.GeoSeries(union.geoms, crs=CRS)
+    except AttributeError:
+        r = gp.GeoSeries(union, crs=CRS)
+    return r
+
+
+def get_linestring(line):
+    """get_linestring: return LineString GeoSeries from line coordinates
+
+    args:
+      line:
+
+    returns:
+       LineString GeoSeries
+    """
+    r = get_coordinates(line)
+    r = np.stack([gp.points_from_xy(*r[:-1].T), gp.points_from_xy(*r[1:].T)])
+    return gp.GeoSeries(pd.DataFrame(r.T).apply(LineString, axis=1), crs=CRS).values
+
+
+def get_segment(line, distance=50.0):
+    """get_segment: segment LineString GeoSeries into distance length segments
+
+    args:
+      line: GeoSeries LineString
+      length: segmentation distance (default value = 50.0)
+
+    returns:
+      GeoSeries of LineStrings of up to length distance
+
+    """
+    return get_linestring(line.segmentize(distance))
+
+
+def get_source_target(line):
+    """get_source_target: return edge and node GeoDataFrames from LineString with unique
+    node Point and edge source and target
+
+    args:
+      line: LineString GeoDataFrame
+
+    returns:
+      edge, node: GeoDataFrames
+
+    """
+    edge = line.copy()
+    r = edge["geometry"].map(get_end)
+    r = np.stack(r)
+    node = gp.GeoSeries(map(Point, r.reshape(-1, 2)), crs=CRS).to_frame("geometry")
+    count = node.groupby("geometry").size().rename("count")
+    node = node.drop_duplicates("geometry").set_index("geometry", drop=False)
+    node = node.join(count).reset_index(drop=True).reset_index(names="node")
+    ix = node.set_index("geometry")["node"]
+    edge = edge.reset_index(names="edge")
+    edge["source"] = ix.loc[map(Point, r[:, 0])].values
+    edge["target"] = ix.loc[map(Point, r[:, 1])].values
+    return edge, node
 
 
 def log(this_string):
@@ -89,46 +191,7 @@ def get_affine_transform(this_gf, scale=1.0):
     return r, s, get_dimension(bound, scale)
 
 
-def get_segment(line, distance=50.0):
-    """get_segment: segment LineString GeoSeries into distance length segments
-
-    args:
-      line: GeoSeries LineString
-      length: segmentation distance (default value = 50.0)
-
-    returns:
-      GeoSeries of LineStrings of up to length distance
-
-    """
-    r = get_coordinates(line.segmentize(distance))
-    r = np.stack([gp.points_from_xy(*r[:-1].T), gp.points_from_xy(*r[1:].T)])
-    return gp.GeoSeries(pd.DataFrame(r.T).apply(LineString, axis=1), crs=CRS).values
-
-
 set_precision_pointone = partial(set_precision, grid_size=0.1)
-
-
-def get_geometry_buffer(this_gf, segment=5.0, radius=8.0):
-    """get_geometry_buffer: return radius buffered geometry using segmented GeoDataFrame
-
-    args:
-      this_gf: GeoDataFrame to
-      segment:  (default value = 5.0)
-      radius:  (default value = 8.0)
-
-    returns:
-      buffered GeoSeries geometry
-
-    """
-    set_segment = partial(get_segment, distance=segment)
-    r = this_gf.map(set_segment).explode()
-    r = gp.GeoSeries(r, crs=CRS).buffer(radius, join_style="mitre")
-    union = unary_union(r)
-    try:
-        r = gp.GeoSeries(union.geoms, crs=CRS)
-    except AttributeError:
-        r = gp.GeoSeries(union, crs=CRS)
-    return r
 
 
 def get_raster_point(raster, value=1):
@@ -166,57 +229,6 @@ def nx_out(this_gf, transform, filepath, layer):
     geometry = r["geometry"].map(transform).map(set_precision_pointone)
     r["geometry"] = geometry
     write_dataframe(r, filepath, layer=layer)
-
-
-def combine_line(line):
-    """combine_line: return LineString GeoSeries combining lines with intersecting endpoints
-
-    args:
-      line: mixed LineString GeoSeries
-
-    returns:
-       LineString GeoSeries
-
-    """
-    r = MultiLineString(line.values)
-    return gp.GeoSeries(line_merge(r).geoms, crs=CRS)
-
-
-def get_end(geometry):
-    """get_end: return numpy array of geometry LineString end-points
-
-    args:
-      geometry: geometry LineString
-
-    returns:
-      end-point numpy arrays
-
-    """
-    r = get_coordinates(geometry)
-    return np.vstack((r[0, :], r[-1, :]))
-
-
-def get_source_target(line):
-    """get_source_target: return edge and node GeoDataFrames from LineString with unique
-    node Point and edge source and target
-
-    args:
-      this_gf: LineString GeoDataFrame
-
-    returns:
-      edge, node: GeoDataFrames
-
-    """
-    edge = line.copy()
-    r = edge["geometry"].map(get_end)
-    r = np.stack(r)
-    node = gp.GeoSeries(map(Point, r.reshape(-1, 2)), crs=CRS).drop_duplicates()
-    node = node.reset_index(drop=True).to_frame("geometry")
-    node = node.reset_index(names="node")
-    ix = node.set_index("geometry")
-    edge["source"] = ix.loc[map(Point, r[:, 0])].values
-    edge["target"] = ix.loc[map(Point, r[:, 1])].values
-    return edge, node
 
 
 def get_nx(line):
@@ -335,7 +347,7 @@ def main(inpath, outpath, buffer_size, scale, knot=False):
     """
     log("start\t")
     base_nx = get_base_geojson(inpath)
-    log("read\tgeojson")
+    log("read geojson")
     write_dataframe(base_nx, outpath, layer="input")
     log("process\t")
     nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=buffer_size)
