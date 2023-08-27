@@ -105,6 +105,25 @@ def get_linestring(line):
     return gp.GeoSeries(pd.DataFrame(r.T).apply(LineString, axis=1), crs=CRS).values
 
 
+def get_nx(line):
+    """get_nx: return primal edge and node network from LineString GeoDataFrame
+
+    args:
+      line: LineString GeoDataFrame
+
+    returns:
+      edge, node GeoDataFrames
+
+    """
+    r = line.map(get_end)
+    edge = gp.GeoSeries(r.map(LineString), crs=CRS)
+    r = np.vstack(r.to_numpy())
+    r = gp.GeoSeries(map(Point, r)).to_frame("geometry")
+    r = r.groupby(r.columns.to_list(), as_index=False).size()
+    node = gp.GeoDataFrame(r, crs=CRS)
+    return edge, node
+
+
 def get_segment(line, distance=50.0):
     """get_segment: segment LineString GeoSeries into distance length segments
 
@@ -231,25 +250,6 @@ def nx_out(this_gf, transform, filepath, layer):
     write_dataframe(r, filepath, layer=layer)
 
 
-def get_nx(line):
-    """get_nx: return primal edge and node network from LineString GeoDataFrame
-
-    args:
-      line: LineString GeoDataFrame
-
-    returns:
-      edge, node GeoDataFrames
-
-    """
-    r = line.map(get_end)
-    edge = gp.GeoSeries(r.map(LineString), crs=CRS)
-    r = np.vstack(r.to_numpy())
-    r = gp.GeoSeries(map(Point, r)).to_frame("geometry")
-    r = r.groupby(r.columns.to_list(), as_index=False).size()
-    node = gp.GeoDataFrame(r, crs=CRS)
-    return edge, node
-
-
 def get_skeleton(geometry, transform, shape):
     """get_skeleton: return skeletonized raster buffer from Shapely geometry
 
@@ -356,9 +356,9 @@ def main(inpath, outpath, buffer_size, scale, knot=False):
     skeleton_im = get_skeleton(nx_geometry, r_matrix, out_shape)
     nx_point = get_raster_point(skeleton_im)
     nx_line = get_raster_line(nx_point, knot)
-    log("write\tsimple")
+    log("write simple")
     nx_out(nx_line, shapely_transform, outpath, "line")
-    log("write\tprimal")
+    log("write primal")
     nx_edge, _ = get_nx(nx_line)
     nx_out(nx_edge, shapely_transform, outpath, "primal")
     log("stop\t")

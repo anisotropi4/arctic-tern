@@ -25,7 +25,9 @@ OGR2OGR=$(which ogr2ogr)
 if [ x"${OGR2OGR}" != x ]; then
     for k in sk vr
     do
-        ogr2ogr -f GeoJSON ${k}-line.geojson ${k}-output.gpkg line
-        sed -i 's/00000[0-9]*//g' ${k}-output.gpkg line
+        if [ ! -s ${k}-line.geojson ]; then
+            ogr2ogr -f GeoJSON ${k}-line.geojson ${k}-output.gpkg line
+            sed -i 's/00000[0-9]*//g' ${k}-line.geojson
+        fi
     done
 fi

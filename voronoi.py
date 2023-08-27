@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""simplify.py: simplify GeoJSON network toGeoPKG layers using Voronoi"""
+"""simplify.py: simplify GeoJSON network to GeoPKG layers using Voronoi polygons"""
 
 import argparse
 import datetime as dt
