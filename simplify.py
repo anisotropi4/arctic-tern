@@ -26,8 +26,6 @@ START = dt.datetime.now()
 OUTPATH = "output.gpkg"
 CRS = "EPSG:27700"
 
-BUFFER = 8.0
-
 
 def get_base_geojson(filepath):
     """get_base_nx: return GeoDataFrame at 0.1m precision from GeoJSON
@@ -110,13 +108,13 @@ def get_segment(line, distance=50.0):
 set_precision_pointone = partial(set_precision, grid_size=0.1)
 
 
-def get_geometry_buffer(this_gf, segment=5.0, radius=BUFFER):
+def get_geometry_buffer(this_gf, segment=5.0, radius=8.0):
     """get_geometry_buffer: return radius buffered geometry using segmented GeoDataFrame
 
     args:
       this_gf: GeoDataFrame to
       segment:  (default value = 5.0)
-      radius:  (default value = BUFFER)
+      radius:  (default value = 8.0)
 
     returns:
       buffered GeoSeries geometry
@@ -324,7 +322,7 @@ def get_raster_line(point, knot=False):
     return r[r.length > 2.0]
 
 
-def main(path, outpath, buffer_size, scale, knot=False):
+def main(inpath, outpath, buffer_size, scale, knot=False):
     """main: load GeoJSON file, use skeletonize buffer to simplify network, and output
     input, simplified and primal network as GeoPKG layers
 
@@ -336,7 +334,7 @@ def main(path, outpath, buffer_size, scale, knot=False):
 
     """
     log("start\t")
-    base_nx = get_base_geojson(path)
+    base_nx = get_base_geojson(inpath)
     log("read\tgeojson")
     write_dataframe(base_nx, outpath, layer="input")
     log("process\t")
@@ -355,7 +353,9 @@ def main(path, outpath, buffer_size, scale, knot=False):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="simplify GeoJSON network")
+    parser = argparse.ArgumentParser(
+        description="GeoJSON network raster simplification"
+    )
     parser.add_argument("inpath", type=str, help="GeoJSON filepath to simplify")
     parser.add_argument(
         "outpath",
