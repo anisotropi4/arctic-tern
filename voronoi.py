@@ -100,6 +100,25 @@ def get_linestring(line):
     return gp.GeoSeries(pd.DataFrame(r.T).apply(LineString, axis=1), crs=CRS).values
 
 
+def get_nx(line):
+    """get_nx: return primal edge and node network from LineString GeoDataFrame
+
+    args:
+      line: LineString GeoDataFrame
+
+    returns:
+      edge, node GeoDataFrames
+
+    """
+    r = line.map(get_end)
+    edge = gp.GeoSeries(r.map(LineString), crs=CRS)
+    r = np.vstack(r.to_numpy())
+    r = gp.GeoSeries(map(Point, r)).to_frame("geometry")
+    r = r.groupby(r.columns.to_list(), as_index=False).size()
+    node = gp.GeoDataFrame(r, crs=CRS)
+    return edge, node
+
+
 def get_segment(line, distance=50.0):
     """get_segment: segment LineString GeoSeries into distance length segments
 
@@ -302,13 +321,14 @@ def main(inpath, outpath, buffer_size, scale, tolerance):
     write_dataframe(base_nx, outpath, layer="input")
     log("process\t")
     nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=buffer_size)
-    # write_dataframe(nx_geometry.to_frame("geometry"), outpath, layer="buffer")
     nx_boundary = get_geometry_line(nx_geometry)
     nx_voronoi = voronoi_nx(nx_boundary, tolerance, scale)
-    # write_dataframe(nx_voronoi.to_frame("geometry"), outpath, layer="voronoi")
     log("dewhisker")
-    line = get_voronoi_line(nx_voronoi, nx_boundary, nx_geometry, buffer_size)
-    write_dataframe(line.to_frame("geometry"), outpath, layer="line")
+    nx_line = get_voronoi_line(nx_voronoi, nx_boundary, nx_geometry, buffer_size)
+    write_dataframe(nx_line.to_frame("geometry"), outpath, layer="line")
+    log("primal")
+    nx_edge, _ = get_nx(nx_line)
+    write_dataframe(nx_edge.to_frame("geometry"), outpath, layer="primal")
     log("stop\t")
 
 
