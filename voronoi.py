@@ -346,7 +346,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--scale", help="Voronoi scale", type=float, default=5.0)
     parser.add_argument("--buffer", help="line buffer [m]", type=float, default=8.0)
-    parser.add_argument("--tolerance", help="keep image knots", type=float, default=1.0)
+    parser.add_argument("--tolerance", help="Voronoi snap distance", type=float, default=1.0)
     args = parser.parse_args()
     main(
         args.inpath,
