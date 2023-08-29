@@ -11,6 +11,17 @@ This creates a simplified network by applying skeletonization to a buffered rast
 ## Voronoi
 This creates a simplified network by creating set of Voronoi polygons from points on the buffer
 
+## Running the code
+
+To run the code in this repo, first download a dataset you would like to simplify.
+There is a test dataset in data/rnet_princes_street.geojson
+
+Then run the following command:
+
+```sh
+python3 skeletonize.py data/rnet_princes_street.geojson
+```
+
 ## Notes
 Both are the skeletonization and Voronoi approach are generic approaches, with the following known issues:
 
