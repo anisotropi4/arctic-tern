@@ -13,13 +13,35 @@ This creates a simplified network by creating set of Voronoi polygons from point
 
 ## Running the code
 
-To run the code in this repo, first download a dataset you would like to simplify.
+Set-up the environment as follows:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install --upgrade wheel
+if [ -s requirements.txt ]; then
+    pip install --upgrade -r requirements.txt | tee setup.txt
+fi
+```
+
+Then download a dataset you would like to simplify.
 There is a test dataset in data/rnet_princes_street.geojson
 
 Then run the following command:
 
 ```sh
 python3 skeletonize.py data/rnet_princes_street.geojson
+```
+
+```sh
+python3 voronoi.py data/rnet_princes_street.geojson
+```
+
+You can visualize the results using QGIS or a tool of your choice.
+
+```sh
+qgis output.gpkg
 ```
 
 ## Notes
