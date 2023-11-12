@@ -68,21 +68,18 @@ def get_end(geometry):
     return np.vstack((r[0, :], r[-1, :]))
 
 
-def get_geometry_buffer(this_gf, segment=5.0, radius=8.0):
-    """get_geometry_buffer: return radius buffered geometry using segmented GeoDataFrame
+def get_geometry_buffer(this_gf, radius=8.0):
+    """get_geometry_buffer: return radius buffered GeoDataFrame
 
     args:
       this_gf: GeoDataFrame to
-      segment: (default value = 5.0)
       radius: (default value = 8.0)
 
     returns:
       buffered GeoSeries geometry
 
     """
-    set_segment = partial(get_segment, distance=segment)
-    r = this_gf.map(set_segment).explode()
-    r = gp.GeoSeries(r, crs=CRS).buffer(radius, join_style="mitre")
+    r = gp.GeoSeries(this_gf, crs=CRS).buffer(radius, join_style="mitre")
     union = unary_union(r)
     try:
         r = gp.GeoSeries(union.geoms, crs=CRS)
@@ -378,7 +375,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--scale", help="raster scale", type=float, default=1.0)
     parser.add_argument("--buffer", help="line buffer [m]", type=float, default=8.0)
-    parser.add_argument("--knot", help="keep image knots", action="store_false")
+    parser.add_argument("--knot", help="keep image knots", action="store_true")
     args = parser.parse_args()
     main(
         args.inpath,
