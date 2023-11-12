@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""simplify.py: simplify GeoJSON network toGeoPKG layers using image skeletonization"""
+"""simplify.py: simplify GeoJSON network to GeoPKG layers using image skeletonization"""
 
 import argparse
 import datetime as dt
@@ -88,20 +88,6 @@ def get_geometry_buffer(this_gf, radius=8.0):
     return r
 
 
-def get_linestring(line):
-    """get_linestring: return LineString GeoSeries from line coordinates
-
-    args:
-      line:
-
-    returns:
-       LineString GeoSeries
-    """
-    r = get_coordinates(line)
-    r = np.stack([gp.points_from_xy(*r[:-1].T), gp.points_from_xy(*r[1:].T)])
-    return gp.GeoSeries(pd.DataFrame(r.T).apply(LineString, axis=1), crs=CRS).values
-
-
 def get_nx(line):
     """get_nx: return primal edge and node network from LineString GeoDataFrame
 
@@ -119,20 +105,6 @@ def get_nx(line):
     r = r.groupby(r.columns.to_list(), as_index=False).size()
     node = gp.GeoDataFrame(r, crs=CRS)
     return edge, node
-
-
-def get_segment(line, distance=50.0):
-    """get_segment: segment LineString GeoSeries into distance length segments
-
-    args:
-      line: GeoSeries LineString
-      length: segmentation distance (default value = 50.0)
-
-    returns:
-      GeoSeries of LineStrings of up to length distance
-
-    """
-    return get_linestring(line.segmentize(distance))
 
 
 def get_source_target(line):
@@ -315,9 +287,9 @@ def get_raster_line(point, knot=False):
     """
     square = point.buffer(1, cap_style="square", mitre_limit=1)
     ix = point.sindex.query(square, predicate="covers").T
-    ix.sort()
-    s = pd.DataFrame(ix).drop_duplicates()
-    s = s[s[0] != s[1]]
+    ix = np.sort(ix)
+    s = pd.DataFrame(ix).drop_duplicates().reset_index(drop=True)
+    s = s.loc[np.where(s[0] != s[1])]
     s = np.stack([point[s[0].values], point[s[1].values]]).T
     r = gp.GeoSeries(map(LineString, s), crs=CRS)
     edge, node = get_source_target(combine_line(r).to_frame("geometry"))
