@@ -145,7 +145,7 @@ def log(this_string):
     print(this_string + f"\t{now}")
 
 
-def get_dimension(bound, scale=1.0):
+def get_pxsize(bound, scale=1.0):
     """get_dimension: calculates scaled image size in px
 
       bound: boundary corner points
@@ -176,7 +176,7 @@ def get_affine_transform(this_gf, scale=1.0):
     s[[4, 5]] = bound[[0, 3]]
     r = s[[1, 0, 4, 3, 2, 5]]
     r = rio.Affine(*r)
-    return r, s, get_dimension(bound, scale)
+    return r, s, get_pxsize(bound, scale)
 
 
 set_precision_pointone = partial(set_precision, grid_size=0.1)
