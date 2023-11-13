@@ -89,13 +89,13 @@ def get_geometry_buffer(this_gf, radius=8.0):
 
 
 def get_nx(line):
-    """get_nx: return primal edge and node network from LineString GeoDataFrame
+    """get_nx: return primal edge network from LineString GeoDataFrame
 
     args:
       line: LineString GeoDataFrame
 
     returns:
-      edge, node GeoDataFrames
+      edge GeoDataFrames
 
     """
     r = line.map(get_end)
@@ -103,8 +103,7 @@ def get_nx(line):
     r = np.vstack(r.to_numpy())
     r = gp.GeoSeries(map(Point, r)).to_frame("geometry")
     r = r.groupby(r.columns.to_list(), as_index=False).size()
-    node = gp.GeoDataFrame(r, crs=CRS)
-    return edge, node
+    return edge
 
 
 def get_source_target(line):
@@ -328,7 +327,7 @@ def main(inpath, outpath, buffer_size, scale, knot=False):
     log("write simple")
     nx_out(nx_line, shapely_transform, outpath, "line")
     log("write primal")
-    nx_edge, _ = get_nx(nx_line)
+    nx_edge = get_nx(nx_line)
     nx_out(nx_edge, shapely_transform, outpath, "primal")
     log("stop\t")
 

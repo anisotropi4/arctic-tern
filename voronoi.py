@@ -63,21 +63,18 @@ def get_end(geometry):
     return np.vstack((r[0, :], r[-1, :]))
 
 
-def get_geometry_buffer(this_gf, segment=5.0, radius=8.0):
-    """get_geometry_buffer: return radius buffered geometry using segmented GeoDataFrame
+def get_geometry_buffer(this_gf, radius=8.0):
+    """get_geometry_buffer: return radius buffered GeoDataFrame
 
     args:
       this_gf: GeoDataFrame to
-      segment: (default value = 5.0)
       radius: (default value = 8.0)
 
     returns:
       buffered GeoSeries geometry
 
     """
-    set_segment = partial(get_segment, distance=segment)
-    r = this_gf.map(set_segment).explode()
-    r = gp.GeoSeries(r, crs=CRS).buffer(radius, join_style="mitre")
+    r = gp.GeoSeries(this_gf, crs=CRS).buffer(radius, join_style="mitre")
     union = unary_union(r)
     try:
         r = gp.GeoSeries(union.geoms, crs=CRS)
@@ -101,13 +98,13 @@ def get_linestring(line):
 
 
 def get_nx(line):
-    """get_nx: return primal edge and node network from LineString GeoDataFrame
+    """get_nx: return primal edge network from LineString GeoDataFrame
 
     args:
       line: LineString GeoDataFrame
 
     returns:
-      edge, node GeoDataFrames
+      edge GeoDataFrames
 
     """
     r = line.map(get_end)
@@ -115,8 +112,7 @@ def get_nx(line):
     r = np.vstack(r.to_numpy())
     r = gp.GeoSeries(map(Point, r)).to_frame("geometry")
     r = r.groupby(r.columns.to_list(), as_index=False).size()
-    node = gp.GeoDataFrame(r, crs=CRS)
-    return edge, node
+    return edge
 
 
 def get_segment(line, distance=50.0):
@@ -329,7 +325,7 @@ def main(inpath, outpath, buffer_size, scale, tolerance):
     nx_line = get_voronoi_line(nx_voronoi, nx_boundary, nx_geometry, buffer_size)
     log("write simple")
     write_dataframe(nx_line.to_frame("geometry"), outpath, layer="line")
-    nx_edge, _ = get_nx(nx_line)
+    nx_edge = get_nx(nx_line)
     log("write primal")
     write_dataframe(nx_edge.to_frame("geometry"), outpath, layer="primal")
     log("stop\t")
