@@ -200,7 +200,7 @@ def get_geometry_line(this_buffer):
     return gp.GeoSeries(r.simplify(tolerance=0.5), crs=CRS)
 
 
-def voronoi_nx(this_buffer, tolerance, scale):
+def get_voronoi(this_buffer, tolerance, scale):
     """voronoi_nx: return Voronoi polygon using segmented points from the buffer
 
     args:
@@ -218,7 +218,8 @@ def voronoi_nx(this_buffer, tolerance, scale):
     r = voronoi_diagram(point, envelope=boundary, tolerance=tolerance, edges=True)
     r = gp.GeoSeries(map(set_precision_pointone, r.geoms), crs=CRS)
     r = r.explode(index_parts=False).clip(boundary)
-    return r[~r.is_empty].reset_index(drop=True)
+    ix = ~r.is_empty & (r.type == "LineString")
+    return r[ix].reset_index(drop=True)
 
 
 def filter_distance(line, boundary, offset):
@@ -233,8 +234,9 @@ def filter_distance(line, boundary, offset):
       simplified LineStrings
     """
     edge, _ = get_source_target(line.to_frame("geometry"))
-    _, distance = boundary.sindex.nearest(edge["geometry"], return_distance=True)
-    ix = distance > offset
+    (ix, _), distance = boundary.sindex.nearest(edge["geometry"], return_distance=True)
+    _, ix = np.unique(ix, return_index=True)
+    ix = distance[ix] > offset
     return combine_line(edge.loc[ix, "geometry"]).simplify(1.0)
 
 
@@ -248,8 +250,8 @@ def filter_buffer(line, geometry):
     returns:
       filtered LineStrings
     """
-    ix = line.sindex.query(geometry, predicate="contains_properly")
-    return combine_line(line.loc[ix[1]]).simplify(1.0)
+    (_, ix) = line.sindex.query(geometry, predicate="contains_properly")
+    return combine_line(line.loc[ix]).simplify(1.0)
 
 
 def set_geometry(line, square):
@@ -322,12 +324,13 @@ def main(inpath, outpath, buffer_size, scale, tolerance):
     log("process\t")
     nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=buffer_size)
     nx_boundary = get_geometry_line(nx_geometry)
-    nx_voronoi = voronoi_nx(nx_boundary, tolerance, scale)
+    nx_voronoi = get_voronoi(nx_boundary, tolerance, scale)
     log("dewhisker")
     nx_line = get_voronoi_line(nx_voronoi, nx_boundary, nx_geometry, buffer_size)
+    log("write simple")
     write_dataframe(nx_line.to_frame("geometry"), outpath, layer="line")
-    log("primal")
     nx_edge, _ = get_nx(nx_line)
+    log("write primal")
     write_dataframe(nx_edge.to_frame("geometry"), outpath, layer="primal")
     log("stop\t")
 
@@ -346,7 +349,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--scale", help="Voronoi scale", type=float, default=5.0)
     parser.add_argument("--buffer", help="line buffer [m]", type=float, default=8.0)
-    parser.add_argument("--tolerance", help="Voronoi snap distance", type=float, default=1.0)
+    parser.add_argument(
+        "--tolerance", help="Voronoi snap distance", type=float, default=1.0
+    )
     args = parser.parse_args()
     main(
         args.inpath,
