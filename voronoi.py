@@ -298,16 +298,18 @@ def get_voronoi_line(voronoi, boundary, geometry, buffer_size):
     return combine_line(r)
 
 
-def main(inpath, outpath, buffer_size, scale, tolerance):
+def main(inpath, outpath, parameter):
     """main: load GeoJSON file, use Voronoi polygons to simplify network, and output
     the input, simplified and primal network as GeoPKG layers
 
     args:
       inpath:      filepath to input GeoJSON file
       outpath:     filepath to output GeoPKG file
-      buffer_size: network buffer distance [m]
-      scale:       scale distance between edge point to form Voronoi
-      tolerance:   snap Voronoi vertices together if their distance is less than this
+      parameter:
+        simplify:    simplify tolerance [m]
+        buffer:      network buffer distance [m]
+        scale:       scale distance between edge point to form Voronoi
+        tolerance:   snap Voronoi vertices together if their distance is less than this
 
     returns:
       None
@@ -318,12 +320,16 @@ def main(inpath, outpath, buffer_size, scale, tolerance):
     log("read geojson")
     write_dataframe(base_nx, outpath, layer="input")
     log("process\t")
-    nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=buffer_size)
+    radius = parameter["buffer"]
+    nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=radius)
     nx_boundary = get_geometry_line(nx_geometry)
-    nx_voronoi = get_voronoi(nx_boundary, tolerance, scale)
+    nx_voronoi = get_voronoi(nx_boundary, parameter["tolerance"], parameter["scale"])
     log("dewhisker")
-    nx_line = get_voronoi_line(nx_voronoi, nx_boundary, nx_geometry, buffer_size)
+    nx_line = get_voronoi_line(nx_voronoi, nx_boundary, nx_geometry, radius)
     log("write simple")
+    simplify = parameter["simplify"]
+    if simplify > 0.0:
+        nx_line = nx_line.simplify(simplify)
     write_dataframe(nx_line.to_frame("geometry"), outpath, layer="line")
     nx_edge = get_nx(nx_line)
     log("write primal")
@@ -343,16 +349,21 @@ if __name__ == "__main__":
         help="GeoGPKG output path",
         default="output.gpkg",
     )
+    parser.add_argument("--simplify", help="tolerance [m]", type=float, default=0.0)
     parser.add_argument("--scale", help="Voronoi scale", type=float, default=5.0)
     parser.add_argument("--buffer", help="line buffer [m]", type=float, default=8.0)
     parser.add_argument(
         "--tolerance", help="Voronoi snap distance", type=float, default=1.0
     )
     args = parser.parse_args()
+    main_parameter = {
+        "simplify": args.simplify,
+        "buffer": args.buffer,
+        "scale": args.scale,
+        "tolerance": args.tolerance,
+    }
     main(
         args.inpath,
-        outpath=args.outpath,
-        buffer_size=args.buffer,
-        scale=args.scale,
-        tolerance=args.tolerance,
+        args.outpath,
+        main_parameter,
     )
