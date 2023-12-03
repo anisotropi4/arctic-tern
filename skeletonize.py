@@ -195,7 +195,7 @@ def get_raster_point(raster, value=1):
     return gp.GeoSeries(map(Point, r.T), crs=CRS)
 
 
-def nx_out(this_gf, transform, filepath, layer):
+def nx_out(this_gf, transform, filepath, layer, simplify=0.0):
     """nx_out: write transform GeoPandas data to GeoPKG layer
 
     args:
@@ -214,6 +214,8 @@ def nx_out(this_gf, transform, filepath, layer):
     except AttributeError:
         pass
     geometry = r["geometry"].map(transform).map(set_precision_pointone)
+    if simplify > 0.0:
+        geometry = geometry.simplify(simplify)
     r["geometry"] = geometry
     write_dataframe(r, filepath, layer=layer)
 
@@ -241,11 +243,11 @@ def get_skeleton(geometry, transform, shape):
 def get_connected_class(edge_list):
     """get_connected_class: return labeled connected node pandas Series from edge list
 
-    args:
-      edge_list: source, target edge pandas DataFrame
+        args:
+    >      edge_list: source, target edge pandas DataFrame
 
-    returns:
-      labeled node pandas Series
+        returns:
+          labeled node pandas Series
 
     """
     nx_graph = nx.from_pandas_edgelist(edge_list)
@@ -302,7 +304,7 @@ def get_raster_line(point, knot=False):
     return r[r.length > 2.0]
 
 
-def main(inpath, outpath, buffer_size, scale, knot=False):
+def main(inpath, outpath, simplify, parameter):
     """main: load GeoJSON file, use skeletonize buffer to simplify network, and output
     input, simplified and primal network as GeoPKG layers
 
@@ -318,17 +320,19 @@ def main(inpath, outpath, buffer_size, scale, knot=False):
     log("read geojson")
     write_dataframe(base_nx, outpath, layer="input")
     log("process\t")
-    nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=buffer_size)
-    r_matrix, s_matrix, out_shape = get_affine_transform(nx_geometry, scale)
+    nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=parameter["buffer"])
+    r_matrix, s_matrix, out_shape = get_affine_transform(
+        nx_geometry, parameter["scale"]
+    )
     shapely_transform = partial(affine_transform, matrix=s_matrix)
     skeleton_im = get_skeleton(nx_geometry, r_matrix, out_shape)
     nx_point = get_raster_point(skeleton_im)
-    nx_line = get_raster_line(nx_point, knot)
+    nx_line = get_raster_line(nx_point, parameter["knot"])
     log("write simple")
-    nx_out(nx_line, shapely_transform, outpath, "line")
+    nx_out(nx_line, shapely_transform, outpath, "line", simplify=simplify)
     log("write primal")
-    nx_edge = get_nx(nx_line)
-    nx_out(nx_edge, shapely_transform, outpath, "primal")
+    nx_line = get_nx(nx_line)
+    nx_out(nx_line, shapely_transform, outpath, "primal", simplify=simplify)
     log("stop\t")
 
 
@@ -344,14 +348,19 @@ if __name__ == "__main__":
         help="GeoGPKG output path",
         default="output.gpkg",
     )
-    parser.add_argument("--scale", help="raster scale", type=float, default=1.0)
+    parser.add_argument("--simplify", help="tolerance [m]", type=float, default=0.0)
     parser.add_argument("--buffer", help="line buffer [m]", type=float, default=8.0)
+    parser.add_argument("--scale", help="raster scale", type=float, default=1.0)
     parser.add_argument("--knot", help="keep image knots", action="store_true")
     args = parser.parse_args()
+    main_parameter = {
+        "buffer": args.buffer,
+        "scale": args.scale,
+        "knot": args.knot,
+    }
     main(
         args.inpath,
-        outpath=args.outpath,
-        buffer_size=args.buffer,
-        scale=args.scale,
-        knot=args.knot,
+        args.outpath,
+        args.simplify,
+        main_parameter,
     )
