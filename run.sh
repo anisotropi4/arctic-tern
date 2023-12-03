@@ -31,15 +31,18 @@ do
 done
 
 echo skeletonize ${INPATH}
-./skeletonize.py ${INPATH}  sk-${OUTPUT}.gpkg
+./skeletonize.py ${INPATH} sk-${OUTPUT}.gpkg
+./skeletonize.py ${INPATH} sk-${OUTPUT}-simple.gpkg --simplify 1.0
 echo voronoi ${INPATH}
 ./voronoi.py ${INPATH} vr-${OUTPUT}.gpkg
+./voronoi.py ${INPATH} vr-${OUTPUT}-simple.gpkg --simplify 1.0
 
 OGR2OGR=$(which ogr2ogr)
 
 if [ x"${OGR2OGR}" != x ]; then
     for k in sk vr
     do
+        rm -f ${k}-line.geojson
         ogr2ogr -f GeoJSON ${k}-line.geojson ${k}-output.gpkg line
         sed -i 's/00000[0-9]*//g' ${k}-line.geojson
     done
