@@ -329,7 +329,7 @@ def split_centres(line, offset):
 
 def get_segment_buffer(geometry, radius):
     """get_segment:"""
-    r = geometry.copy().to_frame("geometry")
+    r = geometry.to_frame("geometry")
     split_centre = partial(split_centres, offset=np.sqrt(1.5) * radius)
     s = gp.GeoSeries(geometry.map(split_centre), crs=CRS)
     s = s.buffer(radius, 0, join_style="round", cap_style="round")
@@ -371,7 +371,7 @@ def main(inpath, outpath, simplify, parameter):
     write_dataframe(base_nx, outpath, layer="input")
     log("process\t")
     radius = parameter["buffer"]
-    scale = parameter["buffer"]
+    scale = parameter["scale"]
     if parameter["segment"]:
         nx_geometry = get_segment_buffer(base_nx["geometry"], radius=radius)
     else:
