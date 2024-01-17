@@ -13,12 +13,21 @@ import pandas as pd
 import rasterio as rio
 import rasterio.features as rif
 from pyogrio import read_dataframe, write_dataframe
-from shapely import get_coordinates, line_merge, set_precision, unary_union
+from shapely import (
+    get_coordinates,
+    line_interpolate_point,
+    line_merge,
+    set_precision,
+    snap,
+    unary_union,
+)
 from shapely.affinity import affine_transform
 from shapely.geometry import LineString, MultiLineString, MultiPoint, Point
+from shapely.ops import split
 from skimage.morphology import remove_small_holes, skeletonize
 
 TRANSFORM_ONE = np.asarray([0.0, 1.0, -1.0, 0.0, 1.0, 1.0])
+EMPTY = LineString([])
 
 pd.set_option("display.max_columns", None)
 START = dt.datetime.now()
@@ -177,10 +186,6 @@ def get_affine_transform(this_gf, scale=1.0):
     r = rio.Affine(*r)
     return r, s, get_pxsize(bound, scale)
 
-
-set_precision_pointone = partial(set_precision, grid_size=0.1)
-
-
 def get_raster_point(raster, value=1):
     """get_raster_point: return Point GeoSeries from raster array with values >= value
 
@@ -243,11 +248,11 @@ def get_skeleton(geometry, transform, shape):
 def get_connected_class(edge_list):
     """get_connected_class: return labeled connected node pandas Series from edge list
 
-        args:
-    >      edge_list: source, target edge pandas DataFrame
+    args:
+      edge_list: source, target edge pandas DataFrame
 
-        returns:
-          labeled node pandas Series
+    returns:
+      labeled node pandas Series
 
     """
     nx_graph = nx.from_pandas_edgelist(edge_list)
@@ -304,6 +309,51 @@ def get_raster_line(point, knot=False):
     return r[r.length > 2.0]
 
 
+def get_split(line, point, separation=1.0e-6):
+    """get_split:"""
+    return list(split(snap(line, point, separation), point).geoms)
+
+
+def split_centres(line, offset):
+    """split_centres:"""
+    if line.length <= 2.0 * offset:
+        return EMPTY
+    p = line_interpolate_point(line, offset)
+    _, centre = get_split(line, p)
+    p = line_interpolate_point(centre, -offset)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        centre, _ = get_split(centre, p)
+    return centre
+
+
+def get_segment_buffer(geometry, radius):
+    """get_segment:"""
+    r = geometry.copy().to_frame("geometry")
+    split_centre = partial(split_centres, offset=np.sqrt(1.5) * radius)
+    s = gp.GeoSeries(geometry.map(split_centre), crs=CRS)
+    s = s.buffer(radius, 0, join_style="round", cap_style="round")
+    s = gp.GeoSeries(unary_union(s.values).geoms, crs=CRS)
+    i, j = geometry.sindex.query(s, predicate="intersects")
+    r["class"] = -1
+    r.loc[j, "class"] = s.index[i]
+    count = r.groupby("class").count()
+    r = r.join(count["geometry"].rename("count"), on="class")
+    ix = r["class"] == -1
+    r.loc[ix, "count"] = 0
+    ix = r["count"].isin([0, 1])
+    p = geometry[~ix]
+    p = p.buffer(radius, join_style="round", cap_style="round")
+    try:
+        p = gp.GeoSeries(unary_union(p.values).geoms, crs=CRS)
+    except AttributeError:
+        p = gp.GeoSeries(unary_union(p.values), crs=CRS)
+    q = geometry[ix].buffer(0.612, 64, join_style="mitre", cap_style="round")
+    r = pd.concat([p, q])
+    return r
+
+set_precision_pointone = partial(set_precision, grid_size=0.1)
+
 def main(inpath, outpath, simplify, parameter):
     """main: load GeoJSON file, use skeletonize buffer to simplify network, and output
     input, simplified and primal network as GeoPKG layers
@@ -320,10 +370,13 @@ def main(inpath, outpath, simplify, parameter):
     log("read geojson")
     write_dataframe(base_nx, outpath, layer="input")
     log("process\t")
-    nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=parameter["buffer"])
-    r_matrix, s_matrix, out_shape = get_affine_transform(
-        nx_geometry, parameter["scale"]
-    )
+    radius = parameter["buffer"]
+    scale = parameter["buffer"]
+    if parameter["segment"]:
+        nx_geometry = get_segment_buffer(base_nx["geometry"], radius=radius)
+    else:
+        nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=radius)
+    r_matrix, s_matrix, out_shape = get_affine_transform(nx_geometry, scale)
     shapely_transform = partial(affine_transform, matrix=s_matrix)
     skeleton_im = get_skeleton(nx_geometry, r_matrix, out_shape)
     nx_point = get_raster_point(skeleton_im)
@@ -352,11 +405,13 @@ if __name__ == "__main__":
     parser.add_argument("--buffer", help="line buffer [m]", type=float, default=8.0)
     parser.add_argument("--scale", help="raster scale", type=float, default=1.0)
     parser.add_argument("--knot", help="keep image knots", action="store_true")
+    parser.add_argument("--segment", help="segment", action="store_true")
     args = parser.parse_args()
     main_parameter = {
         "buffer": args.buffer,
         "scale": args.scale,
         "knot": args.knot,
+        "segment": args.segment,
     }
     main(
         args.inpath,
