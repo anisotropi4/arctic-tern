@@ -18,17 +18,18 @@ from shared import (
     get_geometry_buffer,
     get_nx,
     get_source_target,
-    set_precision_pointone,
     log,
+    set_precision_pointone,
 )
 
 pd.set_option("display.max_columns", None)
 CRS = "EPSG:27700"
 
+
 def get_args():
     """get_args: get command line parameters
-      returns:
-        parameter dict
+    returns:
+      parameter dict
     """
     parser = argparse.ArgumentParser(
         description="GeoJSON network Voronoi simplification"
@@ -56,6 +57,7 @@ def get_args():
         "scale": args.scale,
         "tolerance": args.tolerance,
     }
+
 
 def get_linestring(line):
     """get_linestring: return LineString GeoSeries from line coordinates
