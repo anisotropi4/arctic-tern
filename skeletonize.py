@@ -88,7 +88,8 @@ def get_geometry_buffer(this_gf, radius=8.0):
       buffered GeoSeries geometry
 
     """
-    r = gp.GeoSeries(this_gf, crs=CRS).buffer(radius, join_style="mitre")
+    r = gp.GeoSeries(unary_union(this_gf).geoms, crs=CRS)
+    r = gp.GeoSeries(r, crs=CRS).buffer(radius, join_style="mitre")
     union = unary_union(r)
     try:
         r = gp.GeoSeries(union.geoms, crs=CRS)
@@ -327,14 +328,15 @@ def split_centres(line, offset):
     return centre
 
 
-def get_segment_buffer(geometry, radius):
+def get_segment_buffer(this_gf, radius):
     """get_segment:"""
-    r = geometry.to_frame("geometry")
+    r = this_gf.to_frame("geometry")
+    r = gp.GeoSeries(unary_union(r).geoms, crs=CRS).to_frame("geometry")
     split_centre = partial(split_centres, offset=np.sqrt(1.5) * radius)
-    s = gp.GeoSeries(geometry.map(split_centre), crs=CRS)
+    s = gp.GeoSeries(this_gf.map(split_centre), crs=CRS)
     s = s.buffer(radius, 0, join_style="round", cap_style="round")
     s = gp.GeoSeries(unary_union(s.values).geoms, crs=CRS)
-    i, j = geometry.sindex.query(s, predicate="intersects")
+    i, j = this_gf.sindex.query(s, predicate="intersects")
     r["class"] = -1
     r.loc[j, "class"] = s.index[i]
     count = r.groupby("class").count()
@@ -342,13 +344,14 @@ def get_segment_buffer(geometry, radius):
     ix = r["class"] == -1
     r.loc[ix, "count"] = 0
     ix = r["count"].isin([0, 1])
-    p = geometry[~ix]
+    p = this_gf[~ix]
+    p = gp.GeoSeries(unary_union(p).geoms, crs=CRS)
     p = p.buffer(radius, join_style="round", cap_style="round")
     try:
         p = gp.GeoSeries(unary_union(p.values).geoms, crs=CRS)
     except AttributeError:
         p = gp.GeoSeries(unary_union(p.values), crs=CRS)
-    q = geometry[ix].buffer(0.612, 64, join_style="mitre", cap_style="round")
+    q = this_gf[ix].buffer(0.612, 64, join_style="mitre", cap_style="round")
     r = pd.concat([p, q])
     return r
 
