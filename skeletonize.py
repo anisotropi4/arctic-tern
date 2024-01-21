@@ -272,6 +272,23 @@ def get_segment_buffer(this_gf, radius):
     return r
 
 
+def skeletonize_frame(this_gs, parameter):
+    """skeltonize_frame:"""
+    radius = parameter["buffer"]
+    scale = parameter["scale"]
+    if parameter["segment"]:
+        nx_geometry = get_segment_buffer(this_gs, radius=radius)
+    else:
+        nx_geometry = get_geometry_buffer(this_gs, radius=radius)
+    r_matrix, s_matrix, out_shape = get_affine_transform(nx_geometry, scale)
+    shapely_transform = partial(affine_transform, matrix=s_matrix)
+    skeleton_im = get_skeleton(nx_geometry, r_matrix, out_shape)
+    nx_point = get_raster_point(skeleton_im)
+    sx_line = get_raster_line(nx_point, parameter["knot"])
+    tolerance = parameter["tolerance"]
+    return sx_to_nx(sx_line, shapely_transform, simplify=tolerance)
+
+
 set_precision_pointone = partial(set_precision, grid_size=0.1)
 
 
@@ -293,25 +310,12 @@ def main():
     outpath = parameter["outpath"]
     write_dataframe(base_nx, outpath, layer="input")
     log("process\t")
-    radius = parameter["buffer"]
-    scale = parameter["scale"]
-    if parameter["segment"]:
-        nx_geometry = get_segment_buffer(base_nx["geometry"], radius=radius)
-    else:
-        nx_geometry = get_geometry_buffer(base_nx["geometry"], radius=radius)
-    r_matrix, s_matrix, out_shape = get_affine_transform(nx_geometry, scale)
-    shapely_transform = partial(affine_transform, matrix=s_matrix)
-    skeleton_im = get_skeleton(nx_geometry, r_matrix, out_shape)
-    sx_point = get_raster_point(skeleton_im)
-    sx_line = get_raster_line(sx_point, parameter["knot"])
+    nx_line = skeletonize_frame(base_nx["geometry"], parameter)
     log("write simple")
-    tolerance = parameter["tolerance"]
-    nx_line = sx_to_nx(sx_line, shapely_transform, simplify=tolerance)
     write_dataframe(nx_line, outpath, "line")
     log("write primal")
-    nx_line = get_nx(nx_line)
-    line_mx = sx_to_nx(nx_line, shapely_transform, simplify=tolerance)
-    write_dataframe(line_mx, outpath, "primal")
+    mx_line = get_nx(nx_line["geometry"]).to_frame("geometry")
+    write_dataframe(mx_line, outpath, "primal")
     log("stop\t")
 
 
