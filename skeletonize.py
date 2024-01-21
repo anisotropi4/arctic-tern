@@ -211,6 +211,8 @@ def get_raster_line(point, knot=False):
     s = s.loc[np.where(s[0] != s[1])]
     s = np.stack([point[s[0].values], point[s[1].values]]).T
     r = gp.GeoSeries(map(LineString, s), crs=CRS)
+    if r.empty:
+        return gp.GeoSeries(LineString([]))
     edge, node = get_source_target(combine_line(r).to_frame("geometry"))
     if knot:
         return combine_line(edge["geometry"])
