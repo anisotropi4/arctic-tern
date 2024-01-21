@@ -217,7 +217,7 @@ def get_raster_line(point, knot=False):
     ix = edge.length > 2.0
     connected = get_connected_class(edge.loc[~ix, ["source", "target"]])
     if connected.empty:
-        return gp.GeoSeries(LineString([]), crs=CRS)
+        return edge.loc[ix, "geometry"]
     node = node.loc[connected.index].join(connected).sort_index()
     connected_edge = get_centre_edge(node)
     r = combine_line(pd.concat([connected_edge["geometry"], edge.loc[ix, "geometry"]]))
