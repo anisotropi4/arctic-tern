@@ -11,12 +11,10 @@ from pyogrio import write_dataframe
 from shapely import STRtree, box, clip_by_rect, disjoint, voronoi_polygons
 from shapely.geometry import LineString, MultiPoint
 
-from shared import combine_line, get_base_geojson, get_nx, get_source_target, log
+from shared import combine_line, CRS, get_base_geojson, get_nx, get_source_target, log
 from skeletonize import skeletonize_frame
 
 pd.set_option("display.max_columns", None)
-CRS = "EPSG:27700"
-
 
 def get_args():
     """get_args: get command line parameters
