@@ -20,6 +20,7 @@ from skimage.morphology import remove_small_holes, skeletonize
 
 from shared import (
     combine_line,
+    CRS,
     get_base_geojson,
     get_geometry_buffer,
     get_nx,
@@ -31,7 +32,6 @@ TRANSFORM_ONE = np.asarray([0.0, 1.0, -1.0, 0.0, 1.0, 1.0])
 EMPTY = LineString([])
 
 pd.set_option("display.max_columns", None)
-CRS = "EPSG:27700"
 
 
 def get_args():
