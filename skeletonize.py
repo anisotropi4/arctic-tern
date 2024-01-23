@@ -254,6 +254,8 @@ def get_segment_buffer(this_gs, radius):
     r = r.to_frame("geometry").reset_index(drop=True)
     split_centre = partial(split_centres, offset=np.sqrt(1.5) * radius)
     s = gp.GeoSeries(this_gs.map(split_centre), crs=CRS)
+    if s.is_empty.all():
+        return r.buffer(0.612, 64, join_style="mitre", cap_style="round")
     s = s.buffer(radius, 0, join_style="round", cap_style="round")
     ix = s.is_empty.values
     s = s[~ix].reset_index(drop=True)

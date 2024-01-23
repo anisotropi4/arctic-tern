@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""boxgeometry2: tile geometry"""
+"""tile_skeletonize: tile skeletonize geometry"""
 
 import argparse
 from functools import partial
