@@ -9,9 +9,9 @@ from pyogrio import read_dataframe
 from shapely import get_coordinates, line_merge, set_precision, unary_union
 from shapely.geometry import LineString, MultiLineString, Point
 
-EMPTY = LineString([])
 START = dt.datetime.now()
 CRS = "EPSG:27700"
+#CRS = "EPSG:2157"
 
 set_precision_pointone = partial(set_precision, grid_size=0.1)
 
