@@ -79,10 +79,10 @@ def clip_geometry(*bound, geometry):
     return clip_by_rect(geometry, *s)
 
 
-def get_tile_geometry(this_nx, square, radius):
-    """get_tile_geometry:"""
+def get_tile_extent(this_nx, square, radius):
+    """get_tile_extent:"""
     get_clip_geometry = partial(clip_geometry, geometry=this_nx.unary_union)
-    extent = square.buffer(2.0 * radius, join_style="mitre")
+    extent = square.buffer(3.0 * radius, join_style="mitre")
     r = gp.GeoSeries(extent.bounds.apply(get_clip_geometry, axis=1), crs=CRS)
     ix = r.is_empty
     r = r[~ix].to_frame("geometry")
@@ -113,7 +113,7 @@ def skeletonize_tiles(this_nx, parameter):
     """tile_skeletonize:"""
     radius = parameter["buffer"]
     square = get_square(this_nx, parameter["side_length"])
-    tile = get_tile_geometry(this_nx, square, radius)
+    tile = get_tile_extent(this_nx, square, radius)
     tile = tile.reset_index(drop=True)
     r = []
     n = tile["id"].max()
