@@ -138,13 +138,14 @@ def sx_to_nx(this_gf, transform, simplify=0.0):
     return r
 
 
-def get_skeleton(geometry, transform, shape, scale):
+def get_skeleton(geometry, transform, shape, hole_size):
     """get_skeleton: return skeletonized raster buffer from Shapely geometry
 
     args:
       geometry: Shapely geometry to convert to raster buffer
       transform: rasterio affine transformation
       shape: output buffer px size
+      hole_size: size of hole to remove
 
     returns:
       skeltonized numpy array raster buffer
@@ -154,7 +155,7 @@ def get_skeleton(geometry, transform, shape, scale):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         # parent, traverse = max_tree(invert(r))
-        r = remove_small_holes(r, 16 * scale).astype(np.uint8)
+        r = remove_small_holes(r, hole_size).astype(np.uint8)
     return skeletonize(r).astype(np.uint8)
 
 
@@ -295,7 +296,8 @@ def skeletonize_frame(this_gs, parameter):
         nx_geometry = get_geometry_buffer(this_gs, radius=radius)
     r_matrix, s_matrix, out_shape = get_affine_transform(nx_geometry, scale)
     shapely_transform = partial(affine_transform, matrix=s_matrix)
-    skeleton_im = get_skeleton(nx_geometry, r_matrix, out_shape, scale)
+    hole_size = 2.0 * radius * scale * scale
+    skeleton_im = get_skeleton(nx_geometry, r_matrix, out_shape, hole_size)
     nx_point = get_raster_point(skeleton_im)
     sx_line = get_raster_line(nx_point, parameter["knot"])
     tolerance = parameter["tolerance"]
